@@ -6,7 +6,7 @@ from Abstractclass import AbstractBase
 class Base(AbstractBase):
 
     async def take_valute(self):
-        await asyncio.sleep(args.period)
+        await asyncio.sleep(args.period*60)
         url = 'https://cdn.cur.su/api/latest.json'
         async with aiohttp.ClientSession() as request:
             request_1 = await request.get(url)
