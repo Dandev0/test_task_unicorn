@@ -1,11 +1,12 @@
 import aiohttp
 import asyncio
-from val import args
+from parser import args
+from Abstractclass import AbstractBase
 
+class Base(AbstractBase):
 
-class Base:
     async def take_valute(self):
-        # await asyncio.sleep(args.period)
+        await asyncio.sleep(args.period)
         url = 'https://cdn.cur.su/api/latest.json'
         async with aiohttp.ClientSession() as request:
             request_1 = await request.get(url)
@@ -28,12 +29,19 @@ class Base:
         return eur
 
     async def sum_valute(self):
-        rub = await self.rub()
-        usd = await self.usd()
-        eur = await self.eur()
-        sum_rub = args.rub + (args.usd * rub) + (args.eur * eur * rub)
-        sum_usd = args.rub/usd + args.usd + (args.eur*usd)
-        sum_eur = args.eur + (args.rub/usd)*eur + (args.usd*eur)
-        sum = [sum_rub, sum_usd, sum_eur]
+        cf_rub_usd = await self.rub()
+        cf_usd_eur = await self.eur()
+        cf_rub_eur = await self.rub() * await self.usd() * await self.eur()
+        self.sum_rub = args.rub + args.usd*cf_rub_usd + args.eur*cf_rub_eur
+        self.sum_usd = args.usd + args.rub/cf_rub_usd + args.eur*cf_usd_eur
+        self.sum_eur = args.eur + args.rub/cf_rub_eur + args.usd*cf_usd_eur
+        sum = [self.sum_rub, self.sum_usd, self.sum_eur]
         return sum
+
+
+
+
+
+
+
 
