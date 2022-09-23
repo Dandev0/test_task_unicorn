@@ -1,25 +1,85 @@
 import asyncio
 from aiohttp import web
-from methods import Base
 from parser import args
 import logging
 import requests
+import aiohttp
+from Abstractclass import AbstractBase
 
-app = web.Application()
-routes = web.RouteTableDef()
-method = Base()
 logging.basicConfig(level='DEBUG')
 logger = logging.getLogger()
+app = web.Application()
+routes = web.RouteTableDef()
+
+
+class Base(AbstractBase):
+    def __init__(self):
+        self.url = 'https://cdn.cur.su/api/latest.json'
+        self.c = 0
+
+    async def take_valute(self):                 #Получаем первый запрос синхронный. c - счетчик для первого получения информации сразу после старта приложения, в else кол-во минут * указанный период
+        while True:
+            await asyncio.sleep(.1)
+            if self.c < 1:
+                a = requests.get(self.url)
+                logging.warning('Запрос 1')
+                request_1 = a.json()
+                app['balances'] = request_1
+                self.c = self.c + 1
+            else:
+                await asyncio.sleep(args.period*60)
+                async with aiohttp.ClientSession() as request:
+                    request_1 = await request.get(self.url)
+                    logging.warning('Запрос 2')
+                    request_1 = await request_1.json()
+                    app['balances'] = request_1
+
+    async def save_valute(self):  # записываем полученную информацию от апи
+        await asyncio.sleep(.1)
+        logging.warning('Валюта получена и сохраняется')
+        self.new_valute = app['balances']
+        return self.new_valute
+
+    async def rub(self):                     # обращение к конкретной валюте для реализации rub/get, usd/get, eur/get
+        rub = app['balances']['rates']['RUB']
+        return rub
+
+    async def usd(self):
+        usd = app['balances']['rates']['USD']
+        return usd
+
+    async def eur(self):
+        eur = app['balances']['rates']['EUR']
+        return eur
+
+    async def sum_valute(self):                           #в этой корутине пересчет баланса для каждой валюты
+        await asyncio.sleep(.1)
+        self.cf_rub_usd = app['balances']['rates']['RUB']
+        self.cf_usd_eur = app['balances']['rates']['USD']
+        self.cf_rub_eur = self.cf_rub_usd * self.cf_usd_eur * app['balances']['rates']['EUR']
+        self.sum_rub = args.rub + args.usd*self.cf_rub_usd + args.eur*self.cf_rub_eur
+        self.sum_usd = args.usd + args.rub/self.cf_rub_usd + args.eur*self.cf_usd_eur
+        self.sum_eur = args.eur + args.rub/self.cf_rub_eur + args.usd*self.cf_usd_eur
+        self.sum = [self.sum_rub, self.sum_usd, self.sum_eur]
+        return self.sum
+
+    async def save_update(self):
+        await asyncio.sleep(10)
+        self.new_sum = await self.sum_valute()
+        return self.new_sum
+
+method = Base()
 
 @routes.get('/rub/get')
-async def eur_get(request):
+async def rub_get(request):
     logger.warning('/rub/get')
     logger.info('give rub valute')
     RUB = await method.rub()
     return web.Response(text=f'Курс рубля к доллару: {RUB}', headers={"content-type": "text/plain"})
 
+
 @routes.get('/usd/get')
-async def eur_get(request):
+async def usd_get(request):
     logger.warning('/usd/get')
     logger.info('give usd valute')
     USD = await method.usd()
@@ -31,7 +91,7 @@ async def eur_get(request):
     logger.warning('/eur/get')
     logger.info('give eur valute')
     EUR = await method.eur()
-    return web.Response(text=f'Курс евро к доллару: {EUR}, headers={"content-type":"text/plain"}')
+    return web.Response(text=f'Курс евро к доллару: {EUR}', headers={"content-type": "text/plain"})
 
 
 @routes.post('/modify')
@@ -99,38 +159,50 @@ async def amount(request):
         text=f'На балансе: Rub = {args.rub} Usd = {args.usd}, Eur = {args.eur}\nСумма в рублях: {round(rub, 2)}\nСумма в долларах: {round(usd, 2)}\nСумма в евро: {round(eur, 2)}',
         headers={"content-type": "text/plain"})
 
-if __name__ == '__main__':
-    async def start():
-        logger.debug('give args')
-        if args.debug.lower() in {'1', 'true', 'y'}:
-            request = requests.get('https://cdn.cur.su/api/latest.json')
-            print(f'Запрос: https://cdn.cur.su/api/latest.json \nСтатус код: {request.status_code}')
-        elif args.debug.lower() in {'0', 'false', 'n'}:
-            print('Приложение стартонуло!\nДанные о курсах валют получены!')
-        await asyncio.sleep(5)
-        while True:
-            logger.warning('give amount')
-            sum = await method.sum_valute()
-            rub = sum[0]
-            usd = sum[1]
-            eur = sum[2]
-            print(f'На балансе: Rub = {args.rub} Usd = {args.usd}, Eur = {args.eur}\nСумма в рублях: {round(rub, 2)}\nСумма в долларах: {round(usd, 2)}\nСумма в евро: {round(eur, 2)}')
-            await asyncio.sleep(55)
 
-    async def background_task(app):
-        app['redis_listener'] = asyncio.create_task(start())
-        yield
-        app['redis_listener'].cancel()
-        await app['redis_listener']
+async def start():
+    logger.debug('give args')
+    if args.debug.lower() in {'1', 'true', 'y'}:
+        request = requests.get('https://cdn.cur.su/api/latest.json')
+        print(f'Запрос: https://cdn.cur.su/api/latest.json \nСтатус код: {request.status_code}')
+    elif args.debug.lower() in {'0', 'false', 'n'}:
+        print('Приложение стартонуло!\nДанные о курсах валют получены!')
+    await asyncio.sleep(1)
 
+async def check_update(app):
+    while True:
+        logging.warning('Вошел в ф-ка чек ап')
+        app['balance'] = await method.sum_valute()
+        app['valute'] = [method.cf_rub_usd, method.cf_usd_eur, await method.eur()]
+        app['check_update_valute'] = [await method.rub(), await method.usd(), await method.eur()]
+        if app['balance'] != await method.save_update() or app['valute'] != app['check_update_valute']:   #между sum_valute и save_valute разница 9.9сек, соответственно сравниваются данные записаные до и после истечения 9.9сек
+            print('Изменился курс валют или баланс кошелька')
+            print('Старый баланс: ', app['balance'],'Ноывй баланс: ', await method.save_update())
+            print('Курс валюты: ',app['check_update_valute'])
+            print(app['valute'])
+            print(app['check_update_valute'])
+        else:
+            print('Баланс кошелька и курс не изменились!')
+        await asyncio.sleep(60)
+
+async def background_tasks(app):
+    app['start'] = asyncio.create_task(start())                  # в ней нет while True, выполнится 1 раз на старте приложения и сама затрется
+    app['take_valute'] = asyncio.create_task(method.take_valute())
+    app['task'] = asyncio.create_task(check_update(app))
+
+async def _on_shutdown(app):                                     #стоп сервера по КРИТИКАЛ статусу(критикал прописан только тут).
+    logging.critical('Server is stoped!')
+    await app['task']
+    if logging.getLogger().level == logging.CRITICAL:
+        app['take_valute'].cancel()
+        app['task'].cancel()
+        await asyncio.sleep(.5)
+
+def main():
+    app.on_startup.append(background_tasks)
     app.add_routes(routes)
-    app.cleanup_ctx.append(background_task)
     web.run_app(app, host='127.0.1.1', port='8080')
+    app.on_shutdown.append(_on_shutdown)
 
-
-
-
-
-
-
-
+if __name__ == '__main__':
+    main()
