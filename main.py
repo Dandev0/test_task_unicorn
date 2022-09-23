@@ -178,9 +178,7 @@ async def check_update(app):
         if app['balance'] != await method.save_update() or app['valute'] != app['check_update_valute']:   #между sum_valute и save_valute разница 9.9сек, соответственно сравниваются данные записаные до и после истечения 9.9сек
             print('Изменился курс валют или баланс кошелька')
             print('Старый баланс: ', app['balance'],'Ноывй баланс: ', await method.save_update())
-            print('Курс валюты: ',app['check_update_valute'])
-            print(app['valute'])
-            print(app['check_update_valute'])
+            print('Актуальный курс валюты: ',app['check_update_valute'])
         else:
             print('Баланс кошелька и курс не изменились!')
         await asyncio.sleep(60)
