@@ -19,7 +19,7 @@ class Base(AbstractBase):
     def __init__(self):
         self.url = 'https://cdn.cur.su/api/latest.json'
 
-    async def take_valute(self):                                       
+    async def take_valute(self):
         while True:
             async with aiohttp.ClientSession() as request:
                 response = await request.get(self.url)
@@ -79,7 +79,8 @@ async def eur_get(request):
 @routes.post('/modify')
 async def modify(request):
     try:
-        logger.info('/modify')
+        request_modify = await request.json()
+        logging.info(f'Тело запроса: {request_modify}')
         key = await request.json()
         dict_modify = {"rub": "0", "usd": "0", "eur": "0"}
         for i in key:
@@ -99,13 +100,15 @@ async def modify(request):
         args.usd += int(dict_modify['usd'])
         args.eur += int(dict_modify['eur'])
     except json.decoder.JSONDecodeError:
+        print('Вы допустили ошибку в запросе')
         return web.Response(text="Вы допустили ошибку в запросе")
 
 
 @routes.post('/set')
 async def set(request):
     try:
-        logger.info('set_balance')
+        request_set = await request.json()
+        logging.info(f'Тело запроса: {request_set}')
         key = await request.json()
         dict_set = {"rub": "0", "usd": "0", "eur": "0"}
         for x in key:
@@ -125,6 +128,7 @@ async def set(request):
         args.usd = int(dict_set['usd'])
         args.eur = int(dict_set['eur'])
     except json.decoder.JSONDecodeError:
+        print('Вы допустили ошибку в запросе')
         return web.Response(text="Вы допустили ошибку в запросе")
 
 
@@ -140,13 +144,14 @@ async def amount(request):
 async def start():
     logger.debug('give args')
     if args.debug.lower() in {'1', 'true', 'y'}:
-        request = requests.get('https://cdn.cur.su/api/latest.json')
-        print(f'Запрос: https://cdn.cur.su/api/latest.json \nСтатус код: {request.status_code}\nОтвет: {request.json()}')
+        pass
     elif args.debug.lower() in {'0', 'false', 'n'}:
-        print('Приложение стартонуло!\nДанные о курсах валют получены!')
+        await asyncio.sleep(1)
+        print(f'Приложение стартонуло!\nДанные о курсах валют получены!\nСумма в рублях: {round(method.sum_rub, 2)}\nСумма в долларах: {round(method.sum_usd, 2)}\nСумма в евро: {round(method.sum_eur, 2)}')
+        logger.disabled = True
 
 
-async def check_update(app):
+async def check_update():
     while True:
         await asyncio.sleep(.5)
         sum_valute = await method.sum_valute()
@@ -154,7 +159,7 @@ async def check_update(app):
         old_valute = [method.cf_rub_usd, method.cf_usd_eur,method.eur]  # данные до записи обновленных устройств
         new_valute = await method.save_valute()
         await asyncio.sleep(.5)
-        if sum_valute != update_balance or old_valute != new_valute:   #между sum_valute и update_balance разница в sleep, соответственно сравниваются данные записаные до и после истечения sleep в save_update_balance
+        if sum_valute != update_balance or old_valute != new_valute:   #между sum_valute и update_balance разница, соответственно сравниваются данные записаные до и после истечения слип в save_epdate_balance
             print('Изменился курс валют или баланс кошелька')
             print('Старый баланс: ', sum_valute,'Ноывй баланс: ', update_balance)
             print('Курс валюты: ', new_valute)
@@ -165,12 +170,12 @@ async def check_update(app):
 async def background_tasks(app):
     app['take_valute'] = asyncio.create_task(method.take_valute())
     app['start'] = asyncio.create_task(start())                  # в ней нет while True, выполнится 1 раз на старте приложения и сама затрется
-    app['task'] = asyncio.create_task(check_update(app))
+    app['task'] = asyncio.create_task(check_update())
 
 
 async def on_shutdown(app):
     if logging.getLogger().level == logging.CRITICAL:
-        background_tasks(app).cancel()
+        logging_level = logging.INFO
         await background_tasks(app).cancel()
 
 
