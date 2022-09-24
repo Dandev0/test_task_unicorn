@@ -158,7 +158,6 @@ async def check_update(app):
             print('Изменился курс валют или баланс кошелька')
             print('Старый баланс: ', sum_valute,'Ноывй баланс: ', update_balance)
             print('Курс валюты: ', new_valute)
-            print(old_valute)
         else:
             print('Баланс кошелька и курс не изменились!')
 
