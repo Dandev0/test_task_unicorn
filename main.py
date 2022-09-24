@@ -19,7 +19,7 @@ class Base(AbstractBase):
     def __init__(self):
         self.url = 'https://cdn.cur.su/api/latest.json'
 
-    async def take_valute(self):                                       #Получаем первый запрос синхронный. c - счетчик для первого получения информации сразу после старта приложения, в else кол-во минут * указанный период
+    async def take_valute(self):                                       
         while True:
             async with aiohttp.ClientSession() as request:
                 response = await request.get(self.url)
@@ -154,7 +154,7 @@ async def check_update(app):
         old_valute = [method.cf_rub_usd, method.cf_usd_eur,method.eur]  # данные до записи обновленных устройств
         new_valute = await method.save_valute()
         await asyncio.sleep(.5)
-        if sum_valute != update_balance or old_valute != new_valute:   #между sum_valute и save_valute разница 9.9сек, соответственно сравниваются данные записаные до и после истечения 9.9сек
+        if sum_valute != update_balance or old_valute != new_valute:   #между sum_valute и update_balance разница в sleep, соответственно сравниваются данные записаные до и после истечения sleep в save_update_balance
             print('Изменился курс валют или баланс кошелька')
             print('Старый баланс: ', sum_valute,'Ноывй баланс: ', update_balance)
             print('Курс валюты: ', new_valute)
